@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Upload, FileText, Check, AlertCircle, Loader2, CreditCard, Sparkles } from 'lucide-react';
 import { compressImage, formatFileSize } from '../utils/compressor';
-import { db } from '../lib/supabase';
+import { db } from '../lib/firebase';
 import { Registration } from '../types';
 
 interface RegistrationFormProps {

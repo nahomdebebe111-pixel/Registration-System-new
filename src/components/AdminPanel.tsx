@@ -3,7 +3,7 @@ import {
   Users, CheckCircle, XCircle, Clock, Search, Filter, Settings, 
   Download, Sparkles, Brain, LogOut, ArrowLeft, ArrowRight, Eye, X, BookOpen, UserCheck, Trash, RefreshCw
 } from 'lucide-react';
-import { db } from '../lib/supabase';
+import { db } from '../lib/firebase';
 import { Registration, GradeSetting, ClassInfo, AdminStats, GradeAnalytics } from '../types';
 
 interface AdminPanelProps {

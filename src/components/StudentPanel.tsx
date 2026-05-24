@@ -1,6 +1,6 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { Search, Loader2, Award, Clock, CheckCircle2, XCircle, ChevronRight, School, Sparkles, UserCheck } from 'lucide-react';
-import { db } from '../lib/supabase';
+import { db } from '../lib/firebase';
 import { Registration } from '../types';
 import RegistrationForm from './RegistrationForm';
 

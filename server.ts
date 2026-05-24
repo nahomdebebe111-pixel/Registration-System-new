@@ -12,6 +12,182 @@ const PORT = 3000;
 
 app.use(express.json());
 
+// Persistent JSON Database Manager for Online Enrollment Sync
+const DB_FILE_PATH = path.join(process.cwd(), 'database.json');
+
+interface LocalDB {
+  registrations: any[];
+  gradeSettings: any[];
+  classes: any[];
+}
+
+const defaultRegistrations = [
+  {
+    id: 'reg-example-1',
+    full_name: 'Almaz Tolosa',
+    age: 16,
+    sex: 'Female',
+    promoted_grade: 11,
+    average: 94.6,
+    transcript_url: 'https://images.unsplash.com/photo-1586281380349-632531db7ed4?auto=format&fit=crop&q=80&w=600',
+    receipt_url: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600',
+    payment_method: 'Commercial Bank of Ethiopia (CBE)',
+    status: 'Approved',
+    class_assignment: '11A',
+    created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'reg-example-2',
+    full_name: 'Kenean Kebede',
+    age: 15,
+    sex: 'Male',
+    promoted_grade: 10,
+    average: 81.2,
+    transcript_url: 'https://images.unsplash.com/photo-1586281380349-632531db7ed4?auto=format&fit=crop&q=80&w=600',
+    receipt_url: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600',
+    payment_method: 'Awash Bank',
+    status: 'Pending Review',
+    created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'reg-example-3',
+    full_name: 'Marta Assefa',
+    age: 17,
+    sex: 'Female',
+    promoted_grade: 12,
+    average: 88.5,
+    transcript_url: 'https://images.unsplash.com/photo-1586281380349-632531db7ed4?auto=format&fit=crop&q=80&w=600',
+    receipt_url: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?auto=format&fit=crop&q=80&w=600',
+    payment_method: 'Telebirr',
+    status: 'Pending Review',
+    created_at: new Date().toISOString()
+  }
+];
+
+const defaultGradeSettings = [
+  { grade: 10, students_per_class: 60 },
+  { grade: 11, students_per_class: 50 },
+  { grade: 12, students_per_class: 45 },
+];
+
+const defaultClasses = [
+  { grade: 10, class_name: '10A', class_type: 'Special', total_students: 0 },
+  { grade: 10, class_name: '10B', class_type: 'Regular', total_students: 0 },
+  { grade: 11, class_name: '11A', class_type: 'Special', total_students: 0 },
+  { grade: 12, class_name: '12A', class_type: 'Regular', total_students: 0 },
+];
+
+function getDB(): LocalDB {
+  try {
+    if (fs.existsSync(DB_FILE_PATH)) {
+      const data = fs.readFileSync(DB_FILE_PATH, 'utf-8');
+      return JSON.parse(data);
+    }
+  } catch (e) {
+    console.error('Error reading database file, reinitializing', e);
+  }
+  const initDb: LocalDB = {
+    registrations: defaultRegistrations,
+    gradeSettings: defaultGradeSettings,
+    classes: defaultClasses
+  };
+  saveDB(initDb);
+  return initDb;
+}
+
+function saveDB(dbData: LocalDB) {
+  try {
+    fs.writeFileSync(DB_FILE_PATH, JSON.stringify(dbData, null, 2), 'utf-8');
+  } catch (e) {
+    console.error('Error writing database file', e);
+  }
+}
+
+// REST database routing APIs for true online multi-user persistence
+app.get('/api/db/registrations', (req, res) => {
+  const dbData = getDB();
+  res.json(dbData.registrations);
+});
+
+app.post('/api/db/registrations', (req, res) => {
+  const body = req.body;
+  const dbData = getDB();
+  const id = `reg-${Math.random().toString(36).substring(2, 11)}`;
+  const newRegistration = {
+    ...body,
+    id,
+    age: Number(body.age),
+    promoted_grade: Number(body.promoted_grade),
+    average: Number(body.average),
+    status: body.status || 'Pending Review',
+    class_assignment: body.class_assignment || null,
+    rejection_reason: body.rejection_reason || null,
+    created_at: new Date().toISOString()
+  };
+  dbData.registrations.unshift(newRegistration);
+  saveDB(dbData);
+  res.status(201).json(newRegistration);
+});
+
+app.put('/api/db/registrations/:id', (req, res) => {
+  const { id } = req.params;
+  const updates = req.body;
+  const dbData = getDB();
+  const index = dbData.registrations.findIndex(r => String(r.id) === String(id));
+  if (index === -1) {
+    return res.status(404).json({ error: 'Registration not found' });
+  }
+  
+  dbData.registrations[index] = {
+    ...dbData.registrations[index],
+    ...updates,
+    id: dbData.registrations[index].id, // Ensure immutable ID
+    created_at: dbData.registrations[index].created_at // Ensure immutable timestamp
+  };
+  saveDB(dbData);
+  res.json(dbData.registrations[index]);
+});
+
+app.delete('/api/db/registrations/:id', (req, res) => {
+  const { id } = req.params;
+  const dbData = getDB();
+  dbData.registrations = dbData.registrations.filter(r => String(r.id) !== String(id));
+  saveDB(dbData);
+  res.json({ success: true });
+});
+
+app.get('/api/db/grade-settings', (req, res) => {
+  const dbData = getDB();
+  res.json(dbData.gradeSettings);
+});
+
+app.post('/api/db/grade-settings', (req, res) => {
+  const { grade, students_per_class } = req.body;
+  const dbData = getDB();
+  const index = dbData.gradeSettings.findIndex(g => Number(g.grade) === Number(grade));
+  const payload = { grade: Number(grade), students_per_class: Number(students_per_class) };
+  if (index !== -1) {
+    dbData.gradeSettings[index] = payload;
+  } else {
+    dbData.gradeSettings.push(payload);
+  }
+  saveDB(dbData);
+  res.json(payload);
+});
+
+app.get('/api/db/classes', (req, res) => {
+  const dbData = getDB();
+  res.json(dbData.classes);
+});
+
+app.post('/api/db/classes', (req, res) => {
+  const classesList = req.body;
+  const dbData = getDB();
+  dbData.classes = classesList;
+  saveDB(dbData);
+  res.json({ success: true });
+});
+
 // Initialize Gemini SDK with custom User-Agent for tracking
 const initGemini = () => {
   const apiKey = process.env.GEMINI_API_KEY;

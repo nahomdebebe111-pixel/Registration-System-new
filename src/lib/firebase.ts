@@ -26,7 +26,7 @@ export const isFirebaseConfigured = (): boolean => {
 
 // Initialize Firebase App conditionally to prevent "invalid-api-key" errors
 export const app = isFirebaseConfigured() ? initializeApp(firebaseConfig) : null;
-export const db = (isFirebaseConfigured() && app ? getFirestore(app, firebaseConfig.firestoreDatabaseId || "(default)") : null) as any;
+export const firestoreDb = (isFirebaseConfigured() && app ? getFirestore(app, firebaseConfig.firestoreDatabaseId || "(default)") : null) as any;
 export const auth = (isFirebaseConfigured() && app ? getAuth(app) : null) as any;
 
 // Security error formatting enum & interface mandated by Firebase Integration skill
@@ -60,12 +60,12 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-      tenantId: auth.currentUser?.tenantId,
-      providerInfo: auth.currentUser?.providerData?.map(provider => ({
+      userId: auth?.currentUser?.uid,
+      email: auth?.currentUser?.email,
+      emailVerified: auth?.currentUser?.emailVerified,
+      isAnonymous: auth?.currentUser?.isAnonymous,
+      tenantId: auth?.currentUser?.tenantId,
+      providerInfo: auth?.currentUser?.providerData?.map((provider: any) => ({
         providerId: provider.providerId,
         email: provider.email,
       })) || []
@@ -77,19 +77,14 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   throw new Error(JSON.stringify(errInfo));
 }
 
-// Local Storage Fallbacks (Matching original schema patterns)
-const LOCAL_REGISTRATIONS_KEY = 'chercher_school_registrations';
-const LOCAL_GRADE_SETTINGS_KEY = 'chercher_school_grade_settings';
-const LOCAL_CLASSES_KEY = 'chercher_school_classes';
-
-// Firestore database client services
-export const firebaseDb = {
+// Unified Active Online Database Instance
+export const db = {
   // --- REGISTRATIONS ---
   async getRegistrations(): Promise<Registration[]> {
     if (isFirebaseConfigured()) {
       const path = 'registrations';
       try {
-        const q = query(collection(db, path), orderBy('created_at', 'desc'));
+        const q = query(collection(firestoreDb, path), orderBy('created_at', 'desc'));
         const querySnapshot = await getDocs(q);
         const registrations: Registration[] = [];
         querySnapshot.forEach((docSnap) => {
@@ -104,15 +99,18 @@ export const firebaseDb = {
       }
     }
     
-    // Local backup fallback
-    const data = localStorage.getItem(LOCAL_REGISTRATIONS_KEY);
-    return data ? JSON.parse(data) : [];
+    // Server-side Online Database Fallback
+    try {
+      const res = await fetch('/api/db/registrations');
+      if (!res.ok) throw new Error('Failed to fetch registrations from server');
+      return await res.json();
+    } catch (e) {
+      console.error('Online REST DB registration fetch failed, empty array fallback:', e);
+      return [];
+    }
   },
 
   async addRegistration(registration: Omit<Registration, 'id' | 'created_at'>): Promise<Registration> {
-    const defaultId = `reg-${Math.random().toString(36).substring(2, 11)}`;
-    const createdAtStr = new Date().toISOString();
-    
     const registrationData = {
       full_name: registration.full_name,
       age: Number(registration.age),
@@ -125,31 +123,33 @@ export const firebaseDb = {
       status: registration.status || 'Pending Review',
       class_assignment: registration.class_assignment || null,
       rejection_reason: registration.rejection_reason || null,
-      created_at: createdAtStr,
     };
 
     if (isFirebaseConfigured()) {
       const path = 'registrations';
       try {
-        const docRef = await addDoc(collection(db, path), registrationData);
+        const docRef = await addDoc(collection(firestoreDb, path), {
+          ...registrationData,
+          created_at: new Date().toISOString(),
+        });
         return {
           ...registrationData,
           id: docRef.id,
+          created_at: new Date().toISOString(),
         };
       } catch (error) {
         handleFirestoreError(error, OperationType.CREATE, path);
       }
     }
 
-    // Local backup fallback
-    const fallbackReg: Registration = {
-      ...registrationData,
-      id: defaultId,
-    };
-    const current = JSON.parse(localStorage.getItem(LOCAL_REGISTRATIONS_KEY) || '[]');
-    current.unshift(fallbackReg);
-    localStorage.setItem(LOCAL_REGISTRATIONS_KEY, JSON.stringify(current));
-    return fallbackReg;
+    // Server-side Online Database Fallback
+    const res = await fetch('/api/db/registrations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(registrationData),
+    });
+    if (!res.ok) throw new Error('Failed to save registration online');
+    return await res.json();
   },
 
   async updateRegistration(id: string | number, updates: Partial<Registration>): Promise<Registration> {
@@ -169,7 +169,7 @@ export const firebaseDb = {
     if (isFirebaseConfigured()) {
       const docPath = `registrations/${id}`;
       try {
-        const docRef = doc(db, 'registrations', String(id));
+        const docRef = doc(firestoreDb, 'registrations', String(id));
         await updateDoc(docRef, updatedFields);
         const freshSnap = await getDoc(docRef);
         return {
@@ -181,28 +181,21 @@ export const firebaseDb = {
       }
     }
 
-    // Local backup fallback
-    const currentList = JSON.parse(localStorage.getItem(LOCAL_REGISTRATIONS_KEY) || '[]');
-    let matchedItem: Registration | null = null;
-    const newList = currentList.map((item: Registration) => {
-      if (String(item.id) === String(id)) {
-        matchedItem = { ...item, ...updates };
-        return matchedItem;
-      }
-      return item;
+    // Server-side Online Database Fallback
+    const res = await fetch(`/api/db/registrations/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedFields),
     });
-    localStorage.setItem(LOCAL_REGISTRATIONS_KEY, JSON.stringify(newList));
-    if (!matchedItem) {
-      throw new Error(`Record ID ${id} not found.`);
-    }
-    return matchedItem;
+    if (!res.ok) throw new Error(`Failed to update registration ${id} online`);
+    return await res.json();
   },
 
   async deleteRegistration(id: string | number): Promise<void> {
     if (isFirebaseConfigured()) {
       const docPath = `registrations/${id}`;
       try {
-        const docRef = doc(db, 'registrations', String(id));
+        const docRef = doc(firestoreDb, 'registrations', String(id));
         await deleteDoc(docRef);
         return;
       } catch (error) {
@@ -210,10 +203,11 @@ export const firebaseDb = {
       }
     }
 
-    // Local backup fallback
-    const currentList = JSON.parse(localStorage.getItem(LOCAL_REGISTRATIONS_KEY) || '[]');
-    const filteredList = currentList.filter((item: Registration) => String(item.id) !== String(id));
-    localStorage.setItem(LOCAL_REGISTRATIONS_KEY, JSON.stringify(filteredList));
+    // Server-side Online Database Fallback
+    const res = await fetch(`/api/db/registrations/${id}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error(`Failed to delete registration ${id} online`);
   },
 
   // --- GRADE SETTINGS ---
@@ -221,27 +215,30 @@ export const firebaseDb = {
     if (isFirebaseConfigured()) {
       const path = 'grade_settings';
       try {
-        const querySnapshot = await getDocs(collection(db, path));
+        const querySnapshot = await getDocs(collection(firestoreDb, path));
         const settings: GradeSetting[] = [];
         querySnapshot.forEach((docSnap) => {
           settings.push(docSnap.data() as GradeSetting);
         });
-        
-        // Ensure grade sorting ascending
-        return settings.sort((a,b) => a.grade - b.grade);
+        return settings.sort((a, b) => a.grade - b.grade);
       } catch (error) {
         handleFirestoreError(error, OperationType.LIST, path);
       }
     }
 
-    // Local backup fallback
-    const data = localStorage.getItem(LOCAL_GRADE_SETTINGS_KEY);
-    const defaultSettings: GradeSetting[] = [
-      { grade: 10, students_per_class: 60 },
-      { grade: 11, students_per_class: 50 },
-      { grade: 12, students_per_class: 45 },
-    ];
-    return data ? JSON.parse(data) : defaultSettings;
+    // Server-side Online Database Fallback
+    try {
+      const res = await fetch('/api/db/grade-settings');
+      if (!res.ok) throw new Error('Failed to fetch grade settings from server');
+      return await res.json();
+    } catch (e) {
+      console.error('Online REST DB grade settings fetch failed, returning default guidelines:', e);
+      return [
+        { grade: 10, students_per_class: 60 },
+        { grade: 11, students_per_class: 50 },
+        { grade: 12, students_per_class: 45 },
+      ];
+    }
   },
 
   async saveGradeSetting(grade: number, studentsPerClass: number): Promise<GradeSetting> {
@@ -253,7 +250,7 @@ export const firebaseDb = {
     if (isFirebaseConfigured()) {
       const docPath = `grade_settings/grade_${grade}`;
       try {
-        const docRef = doc(db, 'grade_settings', `grade_${grade}`);
+        const docRef = doc(firestoreDb, 'grade_settings', `grade_${grade}`);
         await setDoc(docRef, payload);
         return payload;
       } catch (error) {
@@ -261,23 +258,14 @@ export const firebaseDb = {
       }
     }
 
-    // Local backup fallback
-    const current = await this.getGradeSettings();
-    let found = false;
-    const updated = current.map((item) => {
-      if (Number(item.grade) === Number(grade)) {
-        found = true;
-        return { ...item, students_per_class: Number(studentsPerClass) };
-      }
-      return item;
+    // Server-side Online Database Fallback
+    const res = await fetch('/api/db/grade-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
     });
-
-    if (!found) {
-      updated.push(payload);
-    }
-
-    localStorage.setItem(LOCAL_GRADE_SETTINGS_KEY, JSON.stringify(updated));
-    return payload;
+    if (!res.ok) throw new Error('Failed to save grade setting online');
+    return await res.json();
   },
 
   // --- CLASSES ---
@@ -285,7 +273,7 @@ export const firebaseDb = {
     if (isFirebaseConfigured()) {
       const path = 'classes';
       try {
-        const querySnapshot = await getDocs(collection(db, path));
+        const querySnapshot = await getDocs(collection(firestoreDb, path));
         const classesList: ClassInfo[] = [];
         querySnapshot.forEach((docSnap) => {
           classesList.push(docSnap.data() as ClassInfo);
@@ -296,25 +284,29 @@ export const firebaseDb = {
       }
     }
 
-    // Local backup fallback
-    const data = localStorage.getItem(LOCAL_CLASSES_KEY);
-    const defaultClasses: ClassInfo[] = [
-      { grade: 10, class_name: '10A', class_type: 'Special', total_students: 0 },
-      { grade: 10, class_name: '10B', class_type: 'Regular', total_students: 0 },
-      { grade: 11, class_name: '11A', class_type: 'Special', total_students: 0 },
-      { grade: 12, class_name: '12A', class_type: 'Special', total_students: 0 },
-    ];
-    return data ? JSON.parse(data) : defaultClasses;
+    // Server-side Online Database Fallback
+    try {
+      const res = await fetch('/api/db/classes');
+      if (!res.ok) throw new Error('Failed to fetch classes from server');
+      return await res.json();
+    } catch (e) {
+      console.error('Online REST DB classes fetch failed, returning default rooms:', e);
+      return [
+        { grade: 10, class_name: '10A', class_type: 'Special', total_students: 0 },
+        { grade: 10, class_name: '10B', class_type: 'Regular', total_students: 0 },
+        { grade: 11, class_name: '11A', class_type: 'Special', total_students: 0 },
+        { grade: 12, class_name: '12A', class_type: 'Regular', total_students: 0 },
+      ];
+    }
   },
 
   async saveClasses(classesList: ClassInfo[]): Promise<void> {
     if (isFirebaseConfigured()) {
       const path = 'classes';
       try {
-        // Overwrite standard list of collections safely using single setDocs per entry
         for (const cl of classesList) {
           const docId = `class_${cl.grade}_${cl.class_name}`.replace(/\s+/g, '_');
-          const docRef = doc(db, 'classes', docId);
+          const docRef = doc(firestoreDb, 'classes', docId);
           await setDoc(docRef, {
             grade: Number(cl.grade),
             class_name: cl.class_name,
@@ -328,7 +320,12 @@ export const firebaseDb = {
       }
     }
 
-    // Local backup fallback
-    localStorage.setItem(LOCAL_CLASSES_KEY, JSON.stringify(classesList));
+    // Server-side Online Database Fallback
+    const res = await fetch('/api/db/classes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(classesList),
+    });
+    if (!res.ok) throw new Error('Failed to save classes online');
   }
 };
