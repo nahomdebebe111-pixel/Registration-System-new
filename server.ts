@@ -105,87 +105,130 @@ function saveDB(dbData: LocalDB) {
 
 // REST database routing APIs for true online multi-user persistence
 app.get('/api/db/registrations', (req, res) => {
-  const dbData = getDB();
-  res.json(dbData.registrations);
+  try {
+    const dbData = getDB();
+    res.json(dbData.registrations);
+  } catch (error: any) {
+    console.error('GET /api/db/registrations error:', error);
+    res.status(500).json({ error: error.message || 'Failed to read registrations' });
+  }
 });
 
 app.post('/api/db/registrations', (req, res) => {
-  const body = req.body;
-  const dbData = getDB();
-  const id = `reg-${Math.random().toString(36).substring(2, 11)}`;
-  const newRegistration = {
-    ...body,
-    id,
-    age: Number(body.age),
-    promoted_grade: Number(body.promoted_grade),
-    average: Number(body.average),
-    status: body.status || 'Pending Review',
-    class_assignment: body.class_assignment || null,
-    rejection_reason: body.rejection_reason || null,
-    created_at: new Date().toISOString()
-  };
-  dbData.registrations.unshift(newRegistration);
-  saveDB(dbData);
-  res.status(201).json(newRegistration);
+  try {
+    const body = req.body;
+    if (!body) {
+      return res.status(400).json({ error: 'Request body is empty' });
+    }
+    const dbData = getDB();
+    const id = `reg-${Math.random().toString(36).substring(2, 11)}`;
+    const newRegistration = {
+      ...body,
+      id,
+      age: Number(body.age),
+      promoted_grade: Number(body.promoted_grade),
+      average: Number(body.average),
+      status: body.status || 'Pending Review',
+      class_assignment: body.class_assignment || null,
+      rejection_reason: body.rejection_reason || null,
+      created_at: new Date().toISOString()
+    };
+    dbData.registrations.unshift(newRegistration);
+    saveDB(dbData);
+    res.status(201).json(newRegistration);
+  } catch (error: any) {
+    console.error('POST /api/db/registrations error:', error);
+    res.status(500).json({ error: error.message || 'Failed to save registration' });
+  }
 });
 
 app.put('/api/db/registrations/:id', (req, res) => {
-  const { id } = req.params;
-  const updates = req.body;
-  const dbData = getDB();
-  const index = dbData.registrations.findIndex(r => String(r.id) === String(id));
-  if (index === -1) {
-    return res.status(404).json({ error: 'Registration not found' });
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+    const dbData = getDB();
+    const index = dbData.registrations.findIndex(r => String(r.id) === String(id));
+    if (index === -1) {
+      return res.status(404).json({ error: 'Registration not found' });
+    }
+    
+    dbData.registrations[index] = {
+      ...dbData.registrations[index],
+      ...updates,
+      id: dbData.registrations[index].id, // Ensure immutable ID
+      created_at: dbData.registrations[index].created_at // Ensure immutable timestamp
+    };
+    saveDB(dbData);
+    res.json(dbData.registrations[index]);
+  } catch (error: any) {
+    console.error('PUT /api/db/registrations error:', error);
+    res.status(500).json({ error: error.message || 'Failed to update registration' });
   }
-  
-  dbData.registrations[index] = {
-    ...dbData.registrations[index],
-    ...updates,
-    id: dbData.registrations[index].id, // Ensure immutable ID
-    created_at: dbData.registrations[index].created_at // Ensure immutable timestamp
-  };
-  saveDB(dbData);
-  res.json(dbData.registrations[index]);
 });
 
 app.delete('/api/db/registrations/:id', (req, res) => {
-  const { id } = req.params;
-  const dbData = getDB();
-  dbData.registrations = dbData.registrations.filter(r => String(r.id) !== String(id));
-  saveDB(dbData);
-  res.json({ success: true });
+  try {
+    const { id } = req.params;
+    const dbData = getDB();
+    dbData.registrations = dbData.registrations.filter(r => String(r.id) !== String(id));
+    saveDB(dbData);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('DELETE /api/db/registrations error:', error);
+    res.status(500).json({ error: error.message || 'Failed to delete registration' });
+  }
 });
 
 app.get('/api/db/grade-settings', (req, res) => {
-  const dbData = getDB();
-  res.json(dbData.gradeSettings);
+  try {
+    const dbData = getDB();
+    res.json(dbData.gradeSettings);
+  } catch (error: any) {
+    console.error('GET /api/db/grade-settings error:', error);
+    res.status(500).json({ error: error.message || 'Failed to read grade settings' });
+  }
 });
 
 app.post('/api/db/grade-settings', (req, res) => {
-  const { grade, students_per_class } = req.body;
-  const dbData = getDB();
-  const index = dbData.gradeSettings.findIndex(g => Number(g.grade) === Number(grade));
-  const payload = { grade: Number(grade), students_per_class: Number(students_per_class) };
-  if (index !== -1) {
-    dbData.gradeSettings[index] = payload;
-  } else {
-    dbData.gradeSettings.push(payload);
+  try {
+    const { grade, students_per_class } = req.body;
+    const dbData = getDB();
+    const index = dbData.gradeSettings.findIndex(g => Number(g.grade) === Number(grade));
+    const payload = { grade: Number(grade), students_per_class: Number(students_per_class) };
+    if (index !== -1) {
+      dbData.gradeSettings[index] = payload;
+    } else {
+      dbData.gradeSettings.push(payload);
+    }
+    saveDB(dbData);
+    res.json(payload);
+  } catch (error: any) {
+    console.error('POST /api/db/grade-settings error:', error);
+    res.status(500).json({ error: error.message || 'Failed to save grade setting' });
   }
-  saveDB(dbData);
-  res.json(payload);
 });
 
 app.get('/api/db/classes', (req, res) => {
-  const dbData = getDB();
-  res.json(dbData.classes);
+  try {
+    const dbData = getDB();
+    res.json(dbData.classes);
+  } catch (error: any) {
+    console.error('GET /api/db/classes error:', error);
+    res.status(500).json({ error: error.message || 'Failed to read classes' });
+  }
 });
 
 app.post('/api/db/classes', (req, res) => {
-  const classesList = req.body;
-  const dbData = getDB();
-  dbData.classes = classesList;
-  saveDB(dbData);
-  res.json({ success: true });
+  try {
+    const classesList = req.body;
+    const dbData = getDB();
+    dbData.classes = classesList;
+    saveDB(dbData);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('POST /api/db/classes error:', error);
+    res.status(500).json({ error: error.message || 'Failed to save classes' });
+  }
 });
 
 // Initialize Gemini SDK with custom User-Agent for tracking

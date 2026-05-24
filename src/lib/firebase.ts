@@ -148,7 +148,16 @@ export const db = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(registrationData),
     });
-    if (!res.ok) throw new Error('Failed to save registration online');
+    if (!res.ok) {
+      let errMsg = 'Failed to save registration online';
+      try {
+        const errJson = await res.json();
+        if (errJson && errJson.error) {
+          errMsg = errJson.error;
+        }
+      } catch (e) {}
+      throw new Error(errMsg);
+    }
     return await res.json();
   },
 
@@ -187,7 +196,16 @@ export const db = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updatedFields),
     });
-    if (!res.ok) throw new Error(`Failed to update registration ${id} online`);
+    if (!res.ok) {
+      let errMsg = `Failed to update registration ${id} online`;
+      try {
+        const errJson = await res.json();
+        if (errJson && errJson.error) {
+          errMsg = errJson.error;
+        }
+      } catch (e) {}
+      throw new Error(errMsg);
+    }
     return await res.json();
   },
 
@@ -207,7 +225,16 @@ export const db = {
     const res = await fetch(`/api/db/registrations/${id}`, {
       method: 'DELETE',
     });
-    if (!res.ok) throw new Error(`Failed to delete registration ${id} online`);
+    if (!res.ok) {
+      let errMsg = `Failed to delete registration ${id} online`;
+      try {
+        const errJson = await res.json();
+        if (errJson && errJson.error) {
+          errMsg = errJson.error;
+        }
+      } catch (e) {}
+      throw new Error(errMsg);
+    }
   },
 
   // --- GRADE SETTINGS ---
@@ -264,7 +291,16 @@ export const db = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    if (!res.ok) throw new Error('Failed to save grade setting online');
+    if (!res.ok) {
+      let errMsg = 'Failed to save grade setting online';
+      try {
+        const errJson = await res.json();
+        if (errJson && errJson.error) {
+          errMsg = errJson.error;
+        }
+      } catch (e) {}
+      throw new Error(errMsg);
+    }
     return await res.json();
   },
 
@@ -326,6 +362,15 @@ export const db = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(classesList),
     });
-    if (!res.ok) throw new Error('Failed to save classes online');
+    if (!res.ok) {
+      let errMsg = 'Failed to save classes online';
+      try {
+        const errJson = await res.json();
+        if (errJson && errJson.error) {
+          errMsg = errJson.error;
+        }
+      } catch (e) {}
+      throw new Error(errMsg);
+    }
   }
 };
