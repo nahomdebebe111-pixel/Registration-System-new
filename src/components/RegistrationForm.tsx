@@ -130,7 +130,9 @@ export default function RegistrationForm({ onSuccess, showToast }: RegistrationF
       // Cloudinary upload settings
       const cloudName = ((import.meta as any).env?.VITE_CLOUDINARY_CLOUD_NAME as string) || 'dgwspegi5';
       const uploadPreset = ((import.meta as any).env?.VITE_CLOUDINARY_UPLOAD_PRESET as string) || 'school_registration';
-      const url = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
+      const isImage = file.type.startsWith('image/');
+      const resourceType = isImage ? 'image' : 'raw';
+      const url = `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`;
 
       const formData = new FormData();
       formData.append('file', fileToUpload);

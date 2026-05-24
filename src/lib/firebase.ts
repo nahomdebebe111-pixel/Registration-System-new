@@ -95,7 +95,7 @@ export const db = {
         });
         return registrations;
       } catch (error) {
-        handleFirestoreError(error, OperationType.LIST, path);
+        console.error('Firestore getRegistrations failed. Proceeding with REST DB fallback:', error);
       }
     }
     
@@ -138,7 +138,7 @@ export const db = {
           created_at: new Date().toISOString(),
         };
       } catch (error) {
-        handleFirestoreError(error, OperationType.CREATE, path);
+        console.error('Firestore addRegistration failed, trying REST fallback:', error);
       }
     }
 
@@ -186,7 +186,7 @@ export const db = {
           id: freshSnap.id,
         };
       } catch (error) {
-        handleFirestoreError(error, OperationType.UPDATE, docPath);
+        console.error(`Firestore updateDoc failed for ${id}, trying REST fallback:`, error);
       }
     }
 
@@ -217,7 +217,7 @@ export const db = {
         await deleteDoc(docRef);
         return;
       } catch (error) {
-        handleFirestoreError(error, OperationType.DELETE, docPath);
+        console.error(`Firestore deleteDoc failed for ${id}, trying REST fallback:`, error);
       }
     }
 
@@ -249,7 +249,7 @@ export const db = {
         });
         return settings.sort((a, b) => a.grade - b.grade);
       } catch (error) {
-        handleFirestoreError(error, OperationType.LIST, path);
+        console.error('Firestore getGradeSettings failed, trying REST fallback:', error);
       }
     }
 
@@ -281,7 +281,7 @@ export const db = {
         await setDoc(docRef, payload);
         return payload;
       } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, docPath);
+        console.error(`Firestore setDoc failed for grade_${grade}, trying REST fallback:`, error);
       }
     }
 
@@ -316,7 +316,7 @@ export const db = {
         });
         return classesList;
       } catch (error) {
-        handleFirestoreError(error, OperationType.LIST, path);
+        console.error('Firestore getClasses failed, trying REST fallback:', error);
       }
     }
 
@@ -352,7 +352,7 @@ export const db = {
         }
         return;
       } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, path);
+        console.error('Firestore saveClasses failed, trying REST fallback:', error);
       }
     }
 
