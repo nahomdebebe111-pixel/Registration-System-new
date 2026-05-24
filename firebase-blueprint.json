@@ -1,0 +1,61 @@
+{
+  "entities": {
+    "Registration": {
+      "title": "Registration",
+      "description": "Student admission stream registration profile",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique registration ID" },
+        "full_name": { "type": "string", "description": "Full name of the student" },
+        "age": { "type": "integer", "description": "Age of the student" },
+        "sex": { "type": "string", "description": "Gender of the student" },
+        "promoted_grade": { "type": "integer", "description": "promoted grade (10, 11, 12)" },
+        "average": { "type": "number", "format": "float", "description": "Previous year average percentage" },
+        "transcript_url": { "type": "string", "description": "Academic transcript URL path" },
+        "receipt_url": { "type": "string", "description": "Transaction confirmation payload path" },
+        "payment_method": { "type": "string", "description": "Payment bank or method" },
+        "status": { "type": "string", "description": "Current status of registration" },
+        "class_assignment": { "type": "string", "description": "Assigned class name if approved" },
+        "rejection_reason": { "type": "string", "description": "Explanation for why request was rejected" },
+        "created_at": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
+      },
+      "required": ["full_name", "age", "sex", "promoted_grade", "average", "transcript_url", "receipt_url", "payment_method", "status"]
+    },
+    "GradeSetting": {
+      "title": "GradeSetting",
+      "description": "Student cap boundaries per grade",
+      "type": "object",
+      "properties": {
+        "grade": { "type": "integer" },
+        "students_per_class": { "type": "integer" }
+      },
+      "required": ["grade", "students_per_class"]
+    },
+    "ClassInfo": {
+      "title": "ClassInfo",
+      "description": "Section groupings for grades",
+      "type": "object",
+      "properties": {
+        "grade": { "type": "integer" },
+        "class_name": { "type": "string" },
+        "class_type": { "type": "string" },
+        "total_students": { "type": "integer" }
+      },
+      "required": ["grade", "class_name", "class_type", "total_students"]
+    }
+  },
+  "firestore": {
+    "registrations": {
+      "schema": "Registration",
+      "description": "Collection of student registration documents"
+    },
+    "grade_settings": {
+      "schema": "GradeSetting",
+      "description": "Configurable caps for classroom allocation balances"
+    },
+    "classes": {
+      "schema": "ClassInfo",
+      "description": "Sections configured by admins"
+    }
+  }
+}

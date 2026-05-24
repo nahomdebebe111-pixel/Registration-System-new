@@ -1,0 +1,49 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Default catch-all denies everything by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper syntax for security boundaries
+    function isStringSize(val, max) {
+      return val is string && val.size() <= max;
+    }
+
+    function isNumberRange(val, min, max) {
+      return (val is int || val is float) && val >= min && val <= max;
+    }
+
+    // Rules for student registrations
+    match /registrations/{registrationId} {
+      // Allowed for students tracking status and admins managing student list
+      allow read: if true;
+      
+      // Strict payload schema limits to guard inputs and verify size boundaries
+      allow create: if request.resource.data.full_name is string 
+                    && request.resource.data.full_name.size() <= 128
+                    && isNumberRange(request.resource.data.age, 5, 99)
+                    && isNumberRange(request.resource.data.promoted_grade, 9, 13)
+                    && isNumberRange(request.resource.data.average, 0, 100)
+                    && isStringSize(request.resource.data.payment_method, 64)
+                    && (request.resource.data.status == 'Pending Review' || request.resource.data.status == 'Approved' || request.resource.data.status == 'Rejected');
+      
+      // Updates and deletions are authorized for administrative dashboard adjustments
+      allow update, delete: if true;
+    }
+
+    // Rules for grade settings (e.g., student caps)
+    match /grade_settings/{settingId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Rules for section groups (e.g., specific high school classes)
+    match /classes/{classId} {
+      allow read: if true;
+      allow write: if true;
+    }
+  }
+}
