@@ -1,0 +1,24 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[[redirects]]
+  from = "/api/verify-admin"
+  to = "/.netlify/functions/verify-admin"
+  status = 200
+
+[[redirects]]
+  from = "/api/ai/registration-review"
+  to = "/.netlify/functions/ai-registration-review"
+  status = 200
+
+[[redirects]]
+  from = "/api/ai/school-balancing-insights"
+  to = "/.netlify/functions/ai-school-balancing-insights"
+  status = 200
+
+# Fallback to handle React front-end single-page application routes when refreshed
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
